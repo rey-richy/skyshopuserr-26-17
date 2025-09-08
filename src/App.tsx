@@ -20,6 +20,10 @@ import { NavigationDebugPanel } from "./components/debug/NavigationDebugPanel";
 import { PerformanceMetricsDashboard } from "./components/debug/PerformanceMetricsDashboard";
 import NavigationDashboard from "./components/NavigationDashboard";
 import React from "react";
+import { AuthProvider } from "@/components/AuthProvider";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminLayout } from "@/components/admin/AdminLayout";
+
 // Lazy load all route components for better performance
 const Home = createLazyRoute(() => import("./pages/Home"), { 
   showProgress: true 
@@ -45,8 +49,12 @@ const ForgotPassword = createLazyRoute(() => import("./pages/ForgotPassword"));
 const NotFound = createLazyRoute(() => import("./pages/NotFound"));
 const Offline = createLazyRoute(() => import("./pages/Offline"));
 
-
-
+// Admin Pages
+const Auth = createLazyRoute(() => import("./pages/Auth"));
+const Unauthorized = createLazyRoute(() => import("./pages/Unauthorized"));
+const AdminDashboard = createLazyRoute(() => import("./pages/admin/AdminDashboard"));
+const AdminProducts = createLazyRoute(() => import("./pages/admin/AdminProducts"));
+const AdminOrders = createLazyRoute(() => import("./pages/admin/AdminOrders"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -137,6 +145,10 @@ const AppContent = () => {
       <GlobalNavigationTracker />
       <NavigationIntentTracker />
       <Routes>
+        {/* Public Auth Routes */}
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/unauthorized" element={<Unauthorized />} />
+        
         {/* Main App Routes */}
         <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
@@ -162,6 +174,20 @@ const AppContent = () => {
           <Route path="help" element={<Navigate to="/faq" replace />} />
         </Route>
         
+        {/* Admin Routes - Protected */}
+        <Route path="/admin" element={
+          <ProtectedRoute requiredRole="manager">
+            <AdminLayout />
+          </ProtectedRoute>
+        }>
+          <Route index element={<AdminDashboard />} />
+          <Route path="products" element={<AdminProducts />} />
+          <Route path="orders" element={<AdminOrders />} />
+          <Route path="customers" element={<div className="p-6"><h1 className="text-2xl font-bold">Customers</h1><p className="text-muted-foreground">Customer management coming soon...</p></div>} />
+          <Route path="inventory" element={<div className="p-6"><h1 className="text-2xl font-bold">Inventory</h1><p className="text-muted-foreground">Inventory management coming soon...</p></div>} />
+          <Route path="analytics" element={<div className="p-6"><h1 className="text-2xl font-bold">Analytics</h1><p className="text-muted-foreground">Analytics dashboard coming soon...</p></div>} />
+          <Route path="settings" element={<div className="p-6"><h1 className="text-2xl font-bold">Settings</h1><p className="text-muted-foreground">Settings panel coming soon...</p></div>} />
+        </Route>
         
         {/* Routes without layout */}
         <Route path="/order-confirmation" element={<OrderConfirmation />} />
@@ -201,26 +227,28 @@ const AppContent = () => {
 const App = () => (
   <HelmetProvider>
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-        <TooltipProvider>
-          <BrowserRouter
-            future={{
-              v7_startTransition: true,
-              v7_relativeSplatPath: true,
-            }}
-          >
-            <AdvancedPWAProvider 
-              enableAll={true}
-              enablePerformanceDashboard={import.meta.env.DEV}
+      <AuthProvider>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+          <TooltipProvider>
+            <BrowserRouter
+              future={{
+                v7_startTransition: true,
+                v7_relativeSplatPath: true,
+              }}
             >
-              <Toaster />
-              <Sonner />
-              <AppContent />
-              <CacheStatus />
-            </AdvancedPWAProvider>
-          </BrowserRouter>
-        </TooltipProvider>
-      </ThemeProvider>
+              <AdvancedPWAProvider 
+                enableAll={true}
+                enablePerformanceDashboard={import.meta.env.DEV}
+              >
+                <Toaster />
+                <Sonner />
+                <AppContent />
+                <CacheStatus />
+              </AdvancedPWAProvider>
+            </BrowserRouter>
+          </TooltipProvider>
+        </ThemeProvider>
+      </AuthProvider>
     </QueryClientProvider>
   </HelmetProvider>
 );
