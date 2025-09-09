@@ -174,12 +174,8 @@ const AppContent = () => {
           <Route path="help" element={<Navigate to="/faq" replace />} />
         </Route>
         
-        {/* Admin Routes - Protected */}
-        <Route path="/admin" element={
-          <ProtectedRoute requiredRole="manager">
-            <AdminLayout />
-          </ProtectedRoute>
-        }>
+        {/* Admin Routes - Open Access */}
+        <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="products" element={<AdminProducts />} />
           <Route path="orders" element={<AdminOrders />} />
