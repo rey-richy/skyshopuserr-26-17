@@ -32,6 +32,7 @@
 import config from '@/lib/config';
 import { products } from '@/lib/products';
 import { circuitBreakerRegistry, CircuitBreakerError, CircuitState } from '@/utils/circuitBreaker';
+import { supabase } from '@/integrations/supabase/client';
 import type {
   ProductsQuery,
   ProductResponse,
@@ -306,6 +307,41 @@ const createMockResponse = <T>(data: T, delay: boolean = true) => {
 // PRODUCT API FUNCTIONS
 // =============================================================================
 
+// Helper to map category slug to primaryCategory
+const categorySlugToType = (slug: string | null): Product['primaryCategory'] => {
+  if (!slug) return 'mens-fashion';
+  if (slug.includes('bags') || slug.includes('shoes')) return 'bags-shoes';
+  if (slug.includes('men')) return 'mens-fashion';
+  if (slug.includes('women')) return 'womens-fashion';
+  if (slug.includes('beauty') || slug.includes('fragrance')) return 'beauty-fragrance';
+  return 'mens-fashion';
+};
+
+// Helper to transform Supabase product to app Product type
+const transformSupabaseProduct = (data: any): Product => {
+  return {
+    id: data.id,
+    title: data.title,
+    handle: data.handle,
+    description: data.description || '',
+    primaryCategory: categorySlugToType(data.category?.slug),
+    subcategory: data.subcategory || '',
+    images: data.images || [],
+    brand: data.brand,
+    tags: data.tags || [],
+    variants: (data.variants || []).map((v: any) => ({
+      id: v.id,
+      sku: v.sku,
+      size: v.size,
+      color: v.color,
+      price: v.price,
+      comparePrice: v.compare_price,
+      stock: v.stock,
+    })),
+    featured: data.is_featured,
+  };
+};
+
 /**
  * Get all products with optional filtering and pagination
  * Backend endpoint: GET /api/products
@@ -314,98 +350,98 @@ export const getProducts = async (query: ProductsQuery = {}): Promise<Product[]>
   const cacheKey = `products:${JSON.stringify(query)}`;
   
   const operation = async (): Promise<Product[]> => {
-    if (config.features.useMockData) {
-      // TODO: Replace with real API call
-      let filteredProducts = [...products];
-      
-      // Apply search filter
-      if (query.search) {
-        const search = query.search.toLowerCase();
-        filteredProducts = filteredProducts.filter(product =>
-          product.title.toLowerCase().includes(search) ||
-          product.description.toLowerCase().includes(search) ||
-          product.brand?.toLowerCase().includes(search)
-        );
-      }
-      
-      // Apply category filter
-      if (query.category) {
-        filteredProducts = filteredProducts.filter(product =>
-          product.primaryCategory === query.category
-        );
-      }
-      
-      // Apply subcategories filter (OR logic for multiple subcategories)
-      if (query.subcategories?.length) {
-        filteredProducts = filteredProducts.filter(product =>
-          query.subcategories!.includes(product.subcategory)
-        );
-      }
-      
-      // Apply size filter
-      if (query.sizes?.length) {
-        filteredProducts = filteredProducts.filter(product =>
-          product.variants.some(variant =>
-            variant.size && query.sizes!.includes(variant.size)
-          )
-        );
-      }
-      
-      // Apply color filter
-      if (query.colors?.length) {
-        filteredProducts = filteredProducts.filter(product =>
-          product.variants.some(variant =>
-            variant.color && query.colors!.includes(variant.color)
-          )
-        );
-      }
-      
-      // Apply price range filter
-      if (query.priceRange) {
-        const [minPrice, maxPrice] = query.priceRange;
-        filteredProducts = filteredProducts.filter(product =>
-          product.variants.some(variant =>
-            variant.price >= minPrice && variant.price <= maxPrice
-          )
-        );
-      }
-      
-      // Apply deals filter - show only products with discounts
-      if (query.showDeals) {
-        filteredProducts = filteredProducts.filter(product =>
-          product.variants.some(variant => 
-            variant.comparePrice && variant.comparePrice > variant.price
-          )
-        );
-      }
-      
-      // Apply sorting
-      if (query.sort) {
-        switch (query.sort) {
-          case 'price-low':
-            filteredProducts.sort((a, b) => 
-              Math.min(...a.variants.map(v => v.price)) - Math.min(...b.variants.map(v => v.price))
-            );
-            break;
-          case 'price-high':
-            filteredProducts.sort((a, b) => 
-              Math.max(...b.variants.map(v => v.price)) - Math.max(...a.variants.map(v => v.price))
-            );
-            break;
-          case 'newest':
-            // Mock: shuffle for demo purposes
-            filteredProducts.sort(() => Math.random() - 0.5);
-            break;
-        }
-      }
-      
-      const response = await createMockResponse(filteredProducts);
-      return response.data;
+    // Fetch from Supabase
+    let supabaseQuery = supabase
+      .from('products')
+      .select(`
+        *,
+        category:categories(id, name, slug),
+        variants:product_variants(*)
+      `)
+      .eq('is_active', true);
+
+    // Apply category filter
+    if (query.category) {
+      const categorySlug = query.category.replace('-', ' ');
+      supabaseQuery = supabaseQuery.or(`category.slug.ilike.%${categorySlug}%`);
     }
 
-    // Real API call (when backend is ready)
-    const response = await apiClient.get<ProductResponse>('/products', query);
-    return response.data;
+    // Apply search filter
+    if (query.search) {
+      supabaseQuery = supabaseQuery.or(`title.ilike.%${query.search}%,description.ilike.%${query.search}%,brand.ilike.%${query.search}%`);
+    }
+
+    const { data, error } = await supabaseQuery;
+
+    if (error) throw error;
+    if (!data) return [];
+
+    let filteredProducts = data.map(transformSupabaseProduct);
+
+    // Apply subcategories filter
+    if (query.subcategories?.length) {
+      filteredProducts = filteredProducts.filter(product =>
+        query.subcategories!.includes(product.subcategory as any)
+      );
+    }
+
+    // Apply size filter
+    if (query.sizes?.length) {
+      filteredProducts = filteredProducts.filter(product =>
+        product.variants.some(variant =>
+          variant.size && query.sizes!.includes(variant.size)
+        )
+      );
+    }
+
+    // Apply color filter
+    if (query.colors?.length) {
+      filteredProducts = filteredProducts.filter(product =>
+        product.variants.some(variant =>
+          variant.color && query.colors!.includes(variant.color)
+        )
+      );
+    }
+
+    // Apply price range filter
+    if (query.priceRange) {
+      const [minPrice, maxPrice] = query.priceRange;
+      filteredProducts = filteredProducts.filter(product =>
+        product.variants.some(variant =>
+          variant.price >= minPrice && variant.price <= maxPrice
+        )
+      );
+    }
+
+    // Apply deals filter
+    if (query.showDeals) {
+      filteredProducts = filteredProducts.filter(product =>
+        product.variants.some(variant => 
+          variant.comparePrice && variant.comparePrice > variant.price
+        )
+      );
+    }
+
+    // Apply sorting
+    if (query.sort) {
+      switch (query.sort) {
+        case 'price-low':
+          filteredProducts.sort((a, b) => 
+            Math.min(...a.variants.map(v => v.price)) - Math.min(...b.variants.map(v => v.price))
+          );
+          break;
+        case 'price-high':
+          filteredProducts.sort((a, b) => 
+            Math.max(...b.variants.map(v => v.price)) - Math.max(...a.variants.map(v => v.price))
+          );
+          break;
+        case 'newest':
+          filteredProducts.reverse();
+          break;
+      }
+    }
+
+    return filteredProducts;
   };
 
   try {
@@ -428,15 +464,21 @@ export const getProductById = async (id: string): Promise<Product | null> => {
   const cacheKey = `product:${id}`;
   
   const operation = async (): Promise<Product | null> => {
-    if (config.features.useMockData) {
-      // TODO: Replace with real API call
-      const product = products.find(p => p.id === id) || null;
-      const response = await createMockResponse(product);
-      return response.data;
-    }
+    const { data, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        category:categories(id, name, slug),
+        variants:product_variants(*)
+      `)
+      .eq('id', id)
+      .eq('is_active', true)
+      .single();
 
-    const response = await apiClient.get<SingleProductResponse>(`/products/${id}`);
-    return response.data;
+    if (error) throw error;
+    if (!data) return null;
+
+    return transformSupabaseProduct(data);
   };
 
   const fallback = (): Product | null => {
@@ -471,21 +513,21 @@ export const getProductByHandle = async (handle: string): Promise<Product | null
   const cacheKey = `product-handle:${handle}`;
   
   const operation = async (): Promise<Product | null> => {
-    if (config.features.useMockData) {
-      try {
-        if (import.meta.env.DEV) console.log('Using mock data, searching for handle:', handle);
-        const product = products.find(p => p.handle === handle) || null;
-        if (import.meta.env.DEV) console.log('Found product:', product ? product.title : 'not found');
-        const response = await createMockResponse(product);
-        return response.data;
-      } catch (error) {
-        console.error('Error in mock data fetch:', error);
-        return null;
-      }
-    }
+    const { data, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        category:categories(id, name, slug),
+        variants:product_variants(*)
+      `)
+      .eq('handle', handle)
+      .eq('is_active', true)
+      .maybeSingle();
 
-    const response = await apiClient.get<SingleProductResponse>(`/products/handle/${handle}`);
-    return response.data;
+    if (error) throw error;
+    if (!data) return null;
+
+    return transformSupabaseProduct(data);
   };
 
   const fallback = (): Product | null => {
@@ -531,15 +573,21 @@ export const searchProducts = async (query: string): Promise<Product[]> => {
  */
 export const getFeaturedProducts = async (): Promise<Product[]> => {
   const operation = async (): Promise<Product[]> => {
-    if (config.features.useMockData) {
-      // TODO: Replace with real API call
-      const featured = products.filter(p => p.featured).slice(0, 8);
-      const response = await createMockResponse(featured);
-      return response.data;
-    }
+    const { data, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        category:categories(id, name, slug),
+        variants:product_variants(*)
+      `)
+      .eq('is_active', true)
+      .eq('is_featured', true)
+      .limit(8);
 
-    const response = await apiClient.get<ProductResponse>('/products', { featured: true });
-    return response.data;
+    if (error) throw error;
+    if (!data) return [];
+
+    return data.map(transformSupabaseProduct);
   };
 
   try {
