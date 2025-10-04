@@ -524,6 +524,90 @@ export type Database = {
         }
         Relationships: []
       }
+      promo_codes: {
+        Row: {
+          code: string
+          created_at: string
+          description: string
+          expiry_date: string | null
+          id: string
+          is_active: boolean
+          max_discount: number | null
+          min_subtotal: number | null
+          start_date: string | null
+          type: string
+          updated_at: string
+          usage_count: number
+          usage_limit: number | null
+          value: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description: string
+          expiry_date?: string | null
+          id?: string
+          is_active?: boolean
+          max_discount?: number | null
+          min_subtotal?: number | null
+          start_date?: string | null
+          type: string
+          updated_at?: string
+          usage_count?: number
+          usage_limit?: number | null
+          value: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string
+          expiry_date?: string | null
+          id?: string
+          is_active?: boolean
+          max_discount?: number | null
+          min_subtotal?: number | null
+          start_date?: string | null
+          type?: string
+          updated_at?: string
+          usage_count?: number
+          usage_limit?: number | null
+          value?: number
+        }
+        Relationships: []
+      }
+      store_settings: {
+        Row: {
+          created_at: string
+          express_delivery_time: string
+          express_shipping_cost: number
+          free_shipping_threshold: number
+          id: string
+          standard_delivery_time: string
+          standard_shipping_cost: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          express_delivery_time?: string
+          express_shipping_cost?: number
+          free_shipping_threshold?: number
+          id?: string
+          standard_delivery_time?: string
+          standard_shipping_cost?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          express_delivery_time?: string
+          express_shipping_cost?: number
+          free_shipping_threshold?: number
+          id?: string
+          standard_delivery_time?: string
+          standard_shipping_cost?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

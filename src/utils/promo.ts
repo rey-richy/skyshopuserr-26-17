@@ -1,4 +1,5 @@
 import { formatCurrency } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface PromoCode {
   type: 'percentage' | 'shipping' | 'fixed';
@@ -8,12 +9,45 @@ export interface PromoCode {
   maxDiscount?: number;
 }
 
+// Fetch active promo codes from database
+export const getActivePromoCodes = async (): Promise<Record<string, PromoCode>> => {
+  const { data, error } = await supabase
+    .from('promo_codes')
+    .select('*')
+    .eq('is_active', true);
+
+  if (error || !data) {
+    console.error('Failed to fetch promo codes:', error);
+    return {};
+  }
+
+  const now = new Date();
+  const validCodes = data.filter(promo => {
+    if (promo.start_date && new Date(promo.start_date) > now) return false;
+    if (promo.expiry_date && new Date(promo.expiry_date) < now) return false;
+    if (promo.usage_limit && promo.usage_count >= promo.usage_limit) return false;
+    return true;
+  });
+
+  return validCodes.reduce((acc, promo) => {
+    acc[promo.code] = {
+      type: promo.type as 'percentage' | 'shipping' | 'fixed',
+      value: Number(promo.value),
+      description: promo.description,
+      minSubtotal: promo.min_subtotal ? Number(promo.min_subtotal) : undefined,
+      maxDiscount: promo.max_discount ? Number(promo.max_discount) : undefined,
+    };
+    return acc;
+  }, {} as Record<string, PromoCode>);
+};
+
+// Legacy fallback codes
 export const PROMO_CODES: Record<string, PromoCode> = {
   'WELCOME10': { 
     type: 'percentage', 
     value: 0.1, 
     description: '10% off your order',
-    maxDiscount: 50000 // Max ₦50,000 discount
+    maxDiscount: 50000
   },
   'FREESHIP': { 
     type: 'shipping', 
@@ -24,8 +58,8 @@ export const PROMO_CODES: Record<string, PromoCode> = {
     type: 'percentage', 
     value: 0.2, 
     description: '20% off your order',
-    minSubtotal: 100000, // Minimum ₦100,000 order
-    maxDiscount: 100000 // Max ₦100,000 discount
+    minSubtotal: 100000,
+    maxDiscount: 100000
   },
 } as const;
 

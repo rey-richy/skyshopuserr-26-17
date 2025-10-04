@@ -55,6 +55,7 @@ const Unauthorized = createLazyRoute(() => import("./pages/Unauthorized"));
 const AdminDashboard = createLazyRoute(() => import("./pages/admin/AdminDashboard"));
 const AdminProducts = createLazyRoute(() => import("./pages/admin/AdminProducts"));
 const AdminOrders = createLazyRoute(() => import("./pages/admin/AdminOrders"));
+const AdminSettings = createLazyRoute(() => import("./pages/admin/AdminSettings"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -179,10 +180,10 @@ const AppContent = () => {
           <Route index element={<AdminDashboard />} />
           <Route path="products" element={<AdminProducts />} />
           <Route path="orders" element={<AdminOrders />} />
+          <Route path="settings" element={<AdminSettings />} />
           <Route path="customers" element={<div className="p-6"><h1 className="text-2xl font-bold">Customers</h1><p className="text-muted-foreground">Customer management coming soon...</p></div>} />
           <Route path="inventory" element={<div className="p-6"><h1 className="text-2xl font-bold">Inventory</h1><p className="text-muted-foreground">Inventory management coming soon...</p></div>} />
           <Route path="analytics" element={<div className="p-6"><h1 className="text-2xl font-bold">Analytics</h1><p className="text-muted-foreground">Analytics dashboard coming soon...</p></div>} />
-          <Route path="settings" element={<div className="p-6"><h1 className="text-2xl font-bold">Settings</h1><p className="text-muted-foreground">Settings panel coming soon...</p></div>} />
         </Route>
         
         {/* Routes without layout */}

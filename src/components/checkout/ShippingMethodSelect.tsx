@@ -1,7 +1,7 @@
 import { FormControl, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/utils';
-import { STANDARD_SHIPPING, EXPRESS_SHIPPING, FREE_SHIPPING_THRESHOLD, calcShippingCost, STANDARD_DELIVERY, EXPRESS_DELIVERY } from '@/lib/shipping';
+import { useStoreSettings } from '@/hooks/useStoreSettings';
 
 interface ShippingMethodSelectProps {
   value: string;
@@ -11,9 +11,11 @@ interface ShippingMethodSelectProps {
 }
 
 export const ShippingMethodSelect = ({ value, onChange, subtotal, error }: ShippingMethodSelectProps) => {
-  const standardCost = calcShippingCost(subtotal, 'standard');
-  const expressCost = calcShippingCost(subtotal, 'express');
-  const isEligibleForFreeShipping = subtotal >= FREE_SHIPPING_THRESHOLD;
+  const { data: settings } = useStoreSettings();
+  
+  const standardCost = settings && subtotal >= settings.free_shipping_threshold ? 0 : settings?.standard_shipping_cost || 800;
+  const expressCost = settings && subtotal >= settings.free_shipping_threshold ? 0 : settings?.express_shipping_cost || 1500;
+  const isEligibleForFreeShipping = settings ? subtotal >= settings.free_shipping_threshold : false;
 
   // Auto-select free shipping when eligible
   if (isEligibleForFreeShipping && value !== 'free') {
@@ -29,7 +31,7 @@ export const ShippingMethodSelect = ({ value, onChange, subtotal, error }: Shipp
             <div className="flex justify-between items-center w-full">
               <div>
                 <p className="font-medium text-primary">🎉 Free Shipping</p>
-                <p className="text-sm text-muted-foreground">{STANDARD_DELIVERY}</p>
+                <p className="text-sm text-muted-foreground">{settings?.standard_delivery_time || '5-7 business days'}</p>
               </div>
               <span className="font-medium text-primary ml-4">Free</span>
             </div>
@@ -44,7 +46,7 @@ export const ShippingMethodSelect = ({ value, onChange, subtotal, error }: Shipp
                 <div className="flex justify-between items-center w-full">
                   <div>
                     <p className="font-medium">Standard Shipping</p>
-                    <p className="text-sm text-muted-foreground">{STANDARD_DELIVERY}</p>
+                    <p className="text-sm text-muted-foreground">{settings?.standard_delivery_time || '5-7 business days'}</p>
                   </div>
                   <span className="font-medium ml-4">
                     {standardCost === 0 ? 'Free' : formatCurrency(standardCost)}
@@ -55,7 +57,7 @@ export const ShippingMethodSelect = ({ value, onChange, subtotal, error }: Shipp
                 <div className="flex justify-between items-center w-full">
                   <div>
                     <p className="font-medium">Express Shipping</p>
-                    <p className="text-sm text-muted-foreground">{EXPRESS_DELIVERY}</p>
+                    <p className="text-sm text-muted-foreground">{settings?.express_delivery_time || '2-3 business days'}</p>
                   </div>
                   <span className="font-medium ml-4">
                     {expressCost === 0 ? 'Free' : formatCurrency(expressCost)}
@@ -66,9 +68,9 @@ export const ShippingMethodSelect = ({ value, onChange, subtotal, error }: Shipp
           </Select>
         )}
       </FormControl>
-      {isEligibleForFreeShipping && (
+      {isEligibleForFreeShipping && settings && (
         <p className="text-sm text-muted-foreground mt-1">
-          🎉 Congratulations! You've unlocked free shipping by spending over {formatCurrency(FREE_SHIPPING_THRESHOLD)}
+          🎉 Congratulations! You've unlocked free shipping by spending over {formatCurrency(settings.free_shipping_threshold)}
         </p>
       )}
       {error && <FormMessage>{error}</FormMessage>}

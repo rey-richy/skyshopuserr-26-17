@@ -1,5 +1,5 @@
 import { formatCurrency } from '@/lib/utils';
-import { STANDARD_DELIVERY, EXPRESS_DELIVERY, calcShippingCost, FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
+import { useStoreSettings } from '@/hooks/useStoreSettings';
 
 interface ShippingMethodProps {
   shippingOption: string;
@@ -12,9 +12,11 @@ const ShippingMethod = ({
   onShippingChange, 
   subtotal
 }: ShippingMethodProps) => {
-  const isEligibleForFreeShipping = subtotal >= FREE_SHIPPING_THRESHOLD;
-  const standardCost = calcShippingCost(subtotal, 'standard');
-  const expressCost = calcShippingCost(subtotal, 'express');
+  const { data: settings } = useStoreSettings();
+  
+  const isEligibleForFreeShipping = settings ? subtotal >= settings.free_shipping_threshold : false;
+  const standardCost = settings && subtotal >= settings.free_shipping_threshold ? 0 : settings?.standard_shipping_cost || 800;
+  const expressCost = settings && subtotal >= settings.free_shipping_threshold ? 0 : settings?.express_shipping_cost || 1500;
 
   // Auto-select free shipping when eligible
   if (isEligibleForFreeShipping && shippingOption !== 'free') {
@@ -30,7 +32,7 @@ const ShippingMethod = ({
           <div className="neu-pressable flex items-center justify-between p-3 rounded-lg ring-2 ring-primary bg-primary/5">
             <div>
               <div className="font-medium text-sm sm:text-base text-primary">🎉 Free Shipping</div>
-              <div className="text-xs sm:text-sm text-muted-foreground">{STANDARD_DELIVERY}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">{settings?.standard_delivery_time || '5-7 business days'}</div>
             </div>
             <div className="flex items-center gap-3">
               <span className="font-semibold text-sm sm:text-base text-primary">Free</span>
@@ -39,9 +41,11 @@ const ShippingMethod = ({
               </div>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            🎉 Congratulations! You've unlocked free shipping by spending over {formatCurrency(FREE_SHIPPING_THRESHOLD)}
-          </p>
+          {settings && (
+            <p className="text-sm text-muted-foreground">
+              🎉 Congratulations! You've unlocked free shipping by spending over {formatCurrency(settings.free_shipping_threshold)}
+            </p>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -50,7 +54,7 @@ const ShippingMethod = ({
           }`}>
             <div>
               <div className="font-medium text-sm sm:text-base">Standard Shipping</div>
-              <div className="text-xs sm:text-sm text-muted-foreground">{STANDARD_DELIVERY}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">{settings?.standard_delivery_time || '5-7 business days'}</div>
             </div>
             <div className="flex items-center gap-3">
               <span className="font-semibold text-sm sm:text-base">
@@ -72,7 +76,7 @@ const ShippingMethod = ({
           }`}>
             <div>
               <div className="font-medium text-sm sm:text-base">Express Shipping</div>
-              <div className="text-xs sm:text-sm text-muted-foreground">{EXPRESS_DELIVERY}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">{settings?.express_delivery_time || '2-3 business days'}</div>
             </div>
             <div className="flex items-center gap-3">
               <span className="font-semibold text-sm sm:text-base">
